@@ -128,9 +128,14 @@ def simulate_trade(entry_price: float, sl_price: float, direction: str,
         if sl_breached:
             # 잔여 SL 청산
             sl_r_signed = -SL_R
-            # 단, TP1 hit 후면 본전 SL 이동 가정 → 잔여 SL = 0R 으로 처리
+            # ★ 결함 #2 수정 (2026-05-17): TP1 hit 후 본전 SL = 0R 가정 거짓.
+            # 실제 본전 SL 도 슬리피지 (entry+exit) + 수수료 (taker exit) 가 적용됨.
+            # 1R = sl_d_pct (가격 %). 본전 SL 의 자본 손실 = slip + taker fee.
+            # 예: BTC slip 1bp×2 + taker 0.06% = 0.08%. sl_d_pct 0.7% 기준 -0.11R
             if tp1_hit:
-                sl_r_signed = 0.0  # 본전 SL
+                slip_pct_be = SLIPPAGE_BPS.get(symbol, 5.0) / 100  # bp → %
+                be_loss_pct = slip_pct_be * 2 + EXIT_FEE_PCT  # entry slip + exit slip + taker fee
+                sl_r_signed = -(be_loss_pct / (sl_d_pct * 100))  # % → R 환산 (음수)
             realized_r += remaining * sl_r_signed
             exit_path.append((bar_idx, sl_r_signed, remaining))
             remaining = 0.0
@@ -149,29 +154,30 @@ def simulate_trade(entry_price: float, sl_price: float, direction: str,
             r_exit = (last_close - entry_price) / (entry_price * sl_d_pct)
         else:
             r_exit = (entry_price - last_close) / (entry_price * sl_d_pct)
-        # trailing 잔여는 trail_max_r 와 close R 중 보수적 (작은 값)
-        if tp2_hit:
-            r_exit = min(r_exit, TRAIL_TARGET_R)
+        # ★ 결함 #3 수정: trail_max_r 를 trailing 청산 가격에 반영.
+        # tp2_hit 후 가격이 거기서 더 갔다가 되돌아온 경우, trail_max_r ×0.7 정도가 현실.
+        # (peak 에서 30% 되돌림 후 exit 가정)
+        if tp2_hit and trail_max_r > 0:
+            trail_exit_r = trail_max_r * 0.7  # peak 의 70% 보수 실현
+            r_exit = max(r_exit, trail_exit_r)  # 둘 중 더 좋은 가격 (현실: trail SL 이 위에서 잡힘)
+            r_exit = min(r_exit, TRAIL_TARGET_R)  # 단, 너무 낙관 X (TP2~TP3 사이 평균)
         realized_r += remaining * r_exit
         exit_path.append((hold_bars, r_exit, remaining))
         remaining = 0.0
 
     # 비용 계산 (R 단위로 환산)
-    # 슬리피지: 진입 + 청산 둘 다
+    # ★ 결함 #3 수정: 분할 청산 시 각 청산마다 fee 발생. 데드코드 정정.
     slip_bps = SLIPPAGE_BPS.get(symbol, 5.0)
-    slip_pct = slip_bps / 100  # bps → %, 0.01% 단위
-    # entry + exit 2회
-    cost_slip_pct = slip_pct * 2
-
-    # 거래 수수료: 진입 (entry) + 청산 1~N회
+    slip_pct = slip_bps / 100  # bps → %
     n_exits = len([e for e in exit_path if e[2] > 0])
-    cost_fee_pct = ENTRY_FEE_PCT + EXIT_FEE_PCT * n_exits / max(n_exits, 1) if n_exits > 0 else ENTRY_FEE_PCT
-    # 단순화: entry fee + exit fee (분할 시 청산 비율 합 = 1 이므로 전체 청산 fee 한 번)
-    cost_fee_pct = ENTRY_FEE_PCT + EXIT_FEE_PCT
+    n_exits = max(n_exits, 1)
 
-    # 펀딩비 — 누적 % 를 sl_d_pct (1R 거리) 로 나눠 R 단위로
+    # 진입 1회 slip + 청산마다 slip × N
+    cost_slip_pct = slip_pct * (1 + n_exits)
+    # 진입 fee + 분할 청산 fee × N (분할마다 taker)
+    cost_fee_pct = ENTRY_FEE_PCT + EXIT_FEE_PCT * n_exits
+
     cost_funding_pct = funding_acc
-
     total_cost_pct = cost_slip_pct + cost_fee_pct + cost_funding_pct
     cost_r = total_cost_pct / (sl_d_pct * 100)  # % → R
 
