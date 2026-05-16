@@ -1669,18 +1669,22 @@ def evaluate_symbol_15m(symbol: str) -> None:
         if candle.is_bullish and candle.is_long_body and 1 <= elapsed_bars <= PRE_ALERT_TIMEOUT_BARS:
             level = 1
             extras = []
-            # Murph 거래량 부스트 (2026-05-17 백테스트 검증)
-            # 시장 유형 분류 (검증된 부스트만 적용)
+            # Murph 거래량 부스트 — 서브에이전트 비판 검토 후 v1.10 정정
+            # D 단독: ★2 격하 (표본 70건 Win CI 65.5~85.9% 넓음, ATR SL 정규화 착시)
+            # D + (다이버/4H/PREMIUM) 조합 시만 ★3
+            # A 단독: 라벨 제거 (의미 없음, EV -0.12R)
             market_type = detect_market_type(closed_15m)
             if market_type == "D_capitulation":
-                extras.append("⚡ 대폭락 자리 (Murph D 시장유형, EV +0.20R N=70)")
-                level = max(level, 3)  # 매우 강력 — Level 3
-            elif market_type == "A_last_climactic":
-                # 정보 라벨 (사용자 차트 참고용). 진입엔 -0.12R 역효과 검증됨.
-                extras.append("⚠️ 마지막 장대형 (Murph A 참고, EV -0.12R 주의)")
-                # level 변경 X — 진입 자체엔 부정 시그널
-            if detect_volume_climactic(closed_15m):
-                extras.append("💥 거래량 폭발 (Murph A 거래량, 참고)")
+                extras.append("⚡ 대폭락 자리 (Murph D, 표본 70건 CI 넓음)")
+                level = max(level, 2)  # 단독 ★2
+                # 조합 부스트 — 다이버/4H/PREMIUM 동반 시 ★3 격상
+                has_strong_combo = (detect_bullish_divergence(closed_15m)
+                                    or rsi_4h <= HTF_RSI_OVERSOLD
+                                    or ("long", symbol) in PREMIUM_SEGMENTS)
+                if has_strong_combo:
+                    level = max(level, 3)
+            # Murph A 단독 라벨 제거 (EV -0.12R / 거래량 폭발 0R = 의미 X)
+            # 추후 A + 조합 EV 측정 후 부활 검토
             if detect_volume_decay_pullback(closed_15m, "long"):
                 extras.append("📉 거래량 감소 재하락 (Murph C, EV +0.16R)")
                 level = max(level, 2)
@@ -1799,15 +1803,17 @@ def evaluate_symbol_15m(symbol: str) -> None:
         if candle.is_bearish and candle.is_long_body and 1 <= elapsed_bars <= PRE_ALERT_TIMEOUT_BARS:
             level = 1
             extras = []
-            # Murph 거래량 부스트 Short 대칭 (검증 후)
+            # Murph 거래량 부스트 Short 대칭 (v1.10 비판 검토 정정)
             market_type = detect_market_type(closed_15m)
             if market_type == "D_capitulation":
-                extras.append("⚡ 대폭락 자리 (Murph D 시장유형, EV +0.20R)")
-                level = max(level, 3)
-            elif market_type == "A_last_climactic":
-                extras.append("⚠️ 마지막 장대형 (Murph A 참고, EV -0.12R 주의)")
-            if detect_volume_climactic(closed_15m):
-                extras.append("💥 거래량 폭발 (Murph A 거래량, 참고)")
+                extras.append("⚡ 대폭락 자리 (Murph D, 표본 70건 CI 넓음)")
+                level = max(level, 2)  # 단독 ★2
+                has_strong_combo = (detect_bearish_divergence(closed_15m)
+                                    or rsi_4h >= HTF_RSI_OVERBOUGHT
+                                    or ("short", symbol) in PREMIUM_SEGMENTS)
+                if has_strong_combo:
+                    level = max(level, 3)
+            # Murph A 단독 라벨 제거
             if detect_volume_decay_pullback(closed_15m, "short"):
                 extras.append("📈 거래량 감소 재상승 (Murph C, EV +0.16R)")
                 level = max(level, 2)
