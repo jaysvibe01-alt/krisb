@@ -1,0 +1,42 @@
+# 비밀 키 (절대 커밋 X)
+_secrets.py
+_krtky_secrets.py
+.env
+*.key
+*.pem
+secrets_store*
+
+# 캐시 / 빌드
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# 로그 (대용량)
+logs/*.log
+logs/*.log.*
+*.log
+
+# 백테스트 결과 (대용량 JSON — 별도 LFS 또는 gitignore)
+backtest_data/*.json
+!backtest_data/.gitkeep
+!backtest_data/README.md
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# 임시
+*.tmp
+*.bak
+*.orig
