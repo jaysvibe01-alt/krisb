@@ -1593,20 +1593,25 @@ def build_entry_signal(level: int, direction: str, symbol: str, k: dict,
             klines_15m=klines_15m,
             klines_1d=klines_1d,
         )
-        emoji_seq = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣"]
+        emoji_seq = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣"]
+        # 분할 청산 가이드 (검증된 분할 비율)
+        split_pcts = ["50% 청산", "20% 청산", "20% 청산", "10% 청산", "잔여", "잔여"]
         tp_lines: list[str] = []
-        for i, (tp_label, tp_price, _src) in enumerate(targets[:5]):
+        for i, (tp_label, tp_price, _src) in enumerate(targets[:6]):
             if direction == "long":
                 rr = (tp_price - entry_price) / sl_distance
             else:
                 rr = (entry_price - tp_price) / sl_distance
             if rr < 0.5:
                 continue
+            split = split_pcts[i] if i < len(split_pcts) else "잔여"
             tp_lines.append(
-                f"  {emoji_seq[i]} {fmt_price(tp_price)} — {tp_label} (RR {rr:.1f})"
+                f"  {emoji_seq[i]} {fmt_price(tp_price)} — {tp_label} (RR {rr:.1f}) — {split}"
             )
         if tp_lines:
-            tp_block = "\n✨ <b>익절 후보 (RR 비율)</b>\n" + "\n".join(tp_lines)
+            tp_block = ("\n✨ <b>익절 후보 (크보나치 6단계 + 분할 청산)</b>\n"
+                        + "\n".join(tp_lines)
+                        + "\n  💡 TP1 50% 청산 후 SL 본전 이동 권장")
 
     # 손절폭 + 가격 둘 다 표시
     sl_line = (
@@ -1614,6 +1619,16 @@ def build_entry_signal(level: int, direction: str, symbol: str, k: dict,
         f"({'↓' if direction == 'long' else '↑'} {fmt_price(sl_price)}) · ATR×1.5"
     )
 
+    # 운영 가이드 한 줄 (v1.13 검증 기반)
+    safe_lev = get_safe_leverage(symbol)
+    ops_line = (
+        f"\n━━━━━━━━━━━━━━━━━━\n"
+        f"💼 <b>운영 가이드</b>\n"
+        f"  • 마진: <b>Isolated</b> · 레버리지: <b>{safe_lev}x</b> (이 종목 wick 99% 기준 안전)\n"
+        f"  • 자본 / 포지션: 50% · 동시 한도: 2 포지션\n"
+        f"  • SL OCO 필수 등록 (청산 회피)\n"
+        f"  • TP1 hit 후 SL 본전 이동 권장"
+    )
     return (
         f"{icon} [{KRTKY_LABEL}] {label} · <b>{direction.upper()}</b> · "
         f"{symbol_kind(symbol)} <b>{symbol}</b>\n"
@@ -1622,7 +1637,8 @@ def build_entry_signal(level: int, direction: str, symbol: str, k: dict,
         f"컨펌봉 (몸통 {c.body_to_range:.0%}, ATR {c.body_to_atr:.1f}×)\n"
         f"RSI 15m {rsi_15m:.1f} · 4H {rsi_4h:.1f}\n"
         f"{sl_line}{trig_line}{tp_block}\n\n"
-        f"{next_action}{extras_str}\n"
+        f"{next_action}{extras_str}"
+        f"{ops_line}\n"
         f"\n{DISCLAIMER_FOOTER}"
     )
 
