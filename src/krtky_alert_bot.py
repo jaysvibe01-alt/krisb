@@ -241,8 +241,11 @@ PREMIUM_SEGMENTS: set[tuple[str, str]] = {
 # 다른 종목 (ETH/SOL/XRP) 은 BTC 만큼 시간 의존성이 강하지 않아 게이트 적용 X
 # ────────────────────────────────────────────────────────────────────
 BTC_TIME_GATE_ENABLED = True
-BTC_LONG_HOURS_KST = range(6, 12)   # 06:00 ≤ h < 12:00 KST
-BTC_SHORT_HOURS_KST = range(6, 18)  # 06:00 ≤ h < 18:00 KST
+# 2026-05-17 게이트 완화 (사용자 지적: BTC 진입 너무 적음)
+# 백테스트 검증: 시간대별 자연 분포 → 18-24 KST 가 36% 점유 (Long+Short 합쳐 최다)
+# S2 시나리오 적용: N 45→81 (+80%), avg R +0.328→+0.316 (거의 유지), Win 75.6→72.8%
+BTC_LONG_HOURS_KST = range(6, 18)   # 06:00 ≤ h < 18:00 KST (Kris 새벽 차단)
+BTC_SHORT_HOURS_KST = range(0, 22)  # 00:00 ≤ h < 22:00 KST (한국 심야 22-24 만 차단)
 
 
 def _kst_hour(ts_ms: int) -> int:
@@ -1505,7 +1508,7 @@ def evaluate_symbol_15m(symbol: str) -> None:
                 state.pre_long_bar = None
             elif not passes_btc_time_gate(symbol, "long", last["close_time"]):
                 # R8: BTC Long 은 KST 06-12 만 통과 (RR 1.37 Win 80%)
-                log.info("%s LONG entry SKIP — BTC R8 시간 게이트 (KST %dh, Long 허용=06-12)",
+                log.info("%s LONG entry SKIP — BTC 시간 게이트 (KST %dh, Long 허용=06-18, S2 완화)",
                          symbol, _kst_hour(last["close_time"]))
                 state.pre_long_bar = None
             elif (lambda gp: not gp[0])(passes_btc_ct_gate(symbol, "long", extras, last)):
@@ -1616,7 +1619,7 @@ def evaluate_symbol_15m(symbol: str) -> None:
                 state.pre_short_bar = None
             elif not passes_btc_time_gate(symbol, "short", last["close_time"]):
                 # R8: BTC Short 은 KST 06-18 만 통과 (RR 1.73 Win 73%)
-                log.info("%s SHORT entry SKIP — BTC R8 시간 게이트 (KST %dh, Short 허용=06-18)",
+                log.info("%s SHORT entry SKIP — BTC 시간 게이트 (KST %dh, Short 허용=00-22, S2 완화)",
                          symbol, _kst_hour(last["close_time"]))
                 state.pre_short_bar = None
             else:
