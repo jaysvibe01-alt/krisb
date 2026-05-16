@@ -1613,8 +1613,8 @@ def build_entry_signal(level: int, direction: str, symbol: str, k: dict,
         if tp_lines:
             tp_block = ("\n✨ <b>익절 (Kris 단타식: TP1 전량 → 재진입)</b>\n"
                         + "\n".join(tp_lines)
-                        + "\n  💡 검증: TP1 100% 청산 = +34,980% vs 길게 끌기 +20.8% (1,683배)"
-                        + "\n  ⚡ 단, '⚡ 대폭락' 자리만 길게 끌고 가기 (Kris 본인 룰)")
+                        + "\n  💡 검증: M1 단순 단타 = +34,980% (6 모델 비교 1위)"
+                        + "\n  📊 D 대폭락도 단타 정답 (Murph 4강 06:23 '300불 먹고 바로 나가')")
 
     # 손절폭 + 가격 둘 다 표시
     sl_line = (
@@ -1631,7 +1631,7 @@ def build_entry_signal(level: int, direction: str, symbol: str, k: dict,
         f"  • 자본 / 포지션: 50% · 동시 한도: 2 포지션\n"
         f"  • SL OCO 필수 등록\n"
         f"  • <b>TP1 (1.236R) 도달 시 100% 청산 → 재진입 대기</b> ⭐\n"
-        f"  • 단, '⚡ 대폭락 자리' 부스트 있을 때만 길게 끌고 가기"
+        f"  • 모든 자리 단타 (검증: 정교 청산 < 단순 단타)"
     )
     return (
         f"{icon} [{KRTKY_LABEL}] {label} · <b>{direction.upper()}</b> · "
