@@ -97,12 +97,14 @@ EXTRA_SYMBOLS = [
 #   SUI  114거래 +0.275R Win 74% (★ 채택)
 #   BNB  137거래 +0.243R Win 71% (★ 채택)
 DEFAULT_SYMBOLS = [
-    "BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT",       # 기존 4
-    "DOGEUSDT", "LINKUSDT",                            # ★★ 우수 (10종 확장)
-    "ADAUSDT", "AVAXUSDT", "SUIUSDT", "BNBUSDT",       # ★ 채택 (10종 확장)
-    "TONUSDT", "HYPEUSDT",                             # 12종 (2026-05-17 사용자 요청)
-    # TON: 108 거래 avg +0.358 Win 77% (★★ 우수 — ETH 급)
-    # HYPE: 82 거래 avg +0.295 Win 72% (★ 채택, 11.5개월 데이터)
+    "BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT",       # 코어 4
+    "DOGEUSDT", "LINKUSDT",                            # ★★ 10종
+    "ADAUSDT", "AVAXUSDT", "SUIUSDT", "BNBUSDT",       # ★ 10종
+    "TONUSDT", "HYPEUSDT",                             # 12종 (TON ★★)
+    "BCHUSDT", "FILUSDT", "ARBUSDT",                   # 19종 ★★ (BCH/FIL/ARB)
+    "LTCUSDT", "OPUSDT", "DOTUSDT", "ETCUSDT",         # 19종 ★ (LTC/OP/DOT/ETC)
+    # TRX 거부 (avg -0.080R Win 53% 손해)
+    # NEAR/APT/SEI/AAVE/INJ/TIA/PEPE/WIF: 데이터 다운로드 실패 — 추후 재시도
 ]
 # 런타임 universe — main() 에서 compute_universe() 결과로 채워짐
 SYMBOLS: list[str] = list(DEFAULT_SYMBOLS)
@@ -223,13 +225,16 @@ PRE_ALERT_TIMEOUT_BARS = 8
 SKIP_SEGMENTS: set[tuple[str, str]] = {
     ("short", "SOLUSDT"),
 }
-# 2026-05-17: 12종 확장 — ★★ 우수 등급 (Win ≥ 75%)
+# 2026-05-17: 19종 확장 — ★★ 우수 등급 (Win ≥ 75%, avg R ≥ 0.35)
 PREMIUM_SEGMENTS: set[tuple[str, str]] = {
     ("long", "SOLUSDT"),    # RR 1.89 Win 74% (기존)
     ("long", "ETHUSDT"),    # RR 1.79 Win 72% (기존)
     ("long", "DOGEUSDT"),   # avg 0.390R Win 77% N=111
     ("long", "LINKUSDT"),   # avg 0.325R Win 74% N=99
-    ("long", "TONUSDT"),    # avg 0.358R Win 77% N=108 (★★ ETH급, 사용자 요청)
+    ("long", "TONUSDT"),    # avg 0.358R Win 77% N=108 (★★ ETH급)
+    ("long", "BCHUSDT"),    # avg 0.418R Win 77% N=98  (★★ 19종 확장)
+    ("long", "FILUSDT"),    # avg 0.450R Win 79% N=91  (★★ 최강 — SOL 다음)
+    ("long", "ARBUSDT"),    # avg 0.431R Win 76% N=101 (★★ 19종 확장)
 }
 
 # ────────────────────────────────────────────────────────────────────
@@ -386,6 +391,11 @@ def _load_ict_telegram_creds() -> tuple[Optional[str], Optional[str]]:
     importlib 로 명시 path 에서 ICT config.py 를 로드하므로, 같은 이름의
     다른 config.py 모듈과 sys.path 충돌은 없다.
     """
+    if os.environ.get("KRTKY_SKIP_ICT_CREDS", "").strip().lower() in (
+        "1", "true", "yes", "on"
+    ):
+        return None, None
+
     bot_token: Optional[str] = None
     chat_id: Optional[str] = None
 

@@ -22,8 +22,17 @@ logs/*.log.*
 
 # 백테스트 결과 (대용량 JSON — 별도 LFS 또는 gitignore)
 backtest_data/*.json
+backtest_data/*.csv
 !backtest_data/.gitkeep
 !backtest_data/README.md
+data/backtest/*.json
+data/backtest/*.csv
+!data/backtest/.gitkeep
+!data/backtest/README.md
+tools/backtests/backtest_data/*.json
+tools/backtests/backtest_data/*.csv
+!tools/backtests/backtest_data/.gitkeep
+!tools/backtests/backtest_data/README.md
 
 # IDE
 .vscode/
