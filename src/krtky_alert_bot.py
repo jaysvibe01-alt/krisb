@@ -98,8 +98,11 @@ EXTRA_SYMBOLS = [
 #   BNB  137거래 +0.243R Win 71% (★ 채택)
 DEFAULT_SYMBOLS = [
     "BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT",       # 기존 4
-    "DOGEUSDT", "LINKUSDT",                            # 신규 ★★ 우수
-    "ADAUSDT", "AVAXUSDT", "SUIUSDT", "BNBUSDT",       # 신규 ★ 채택
+    "DOGEUSDT", "LINKUSDT",                            # ★★ 우수 (10종 확장)
+    "ADAUSDT", "AVAXUSDT", "SUIUSDT", "BNBUSDT",       # ★ 채택 (10종 확장)
+    "TONUSDT", "HYPEUSDT",                             # 12종 (2026-05-17 사용자 요청)
+    # TON: 108 거래 avg +0.358 Win 77% (★★ 우수 — ETH 급)
+    # HYPE: 82 거래 avg +0.295 Win 72% (★ 채택, 11.5개월 데이터)
 ]
 # 런타임 universe — main() 에서 compute_universe() 결과로 채워짐
 SYMBOLS: list[str] = list(DEFAULT_SYMBOLS)
@@ -220,12 +223,13 @@ PRE_ALERT_TIMEOUT_BARS = 8
 SKIP_SEGMENTS: set[tuple[str, str]] = {
     ("short", "SOLUSDT"),
 }
-# 2026-05-17: 10종 확장 백테스트 결과 — ★★ 우수 (avg R ≥ 0.39 AND Win ≥ 76%)
+# 2026-05-17: 12종 확장 — ★★ 우수 등급 (Win ≥ 75%)
 PREMIUM_SEGMENTS: set[tuple[str, str]] = {
     ("long", "SOLUSDT"),    # RR 1.89 Win 74% (기존)
     ("long", "ETHUSDT"),    # RR 1.79 Win 72% (기존)
-    ("long", "DOGEUSDT"),   # avg 0.390R Win 77% N=111 (신규 ★★)
-    ("long", "LINKUSDT"),   # avg 0.325R Win 74% N=99  (신규 ★★)
+    ("long", "DOGEUSDT"),   # avg 0.390R Win 77% N=111
+    ("long", "LINKUSDT"),   # avg 0.325R Win 74% N=99
+    ("long", "TONUSDT"),    # avg 0.358R Win 77% N=108 (★★ ETH급, 사용자 요청)
 }
 
 # ────────────────────────────────────────────────────────────────────
