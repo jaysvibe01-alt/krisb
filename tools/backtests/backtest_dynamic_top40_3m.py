@@ -162,6 +162,14 @@ def cache_path(symbol: str, interval: str) -> Path:
     return CACHE_DIR / f"dynamic_top40_{symbol}_{interval}.json"
 
 
+def safe_text(value: Any) -> str:
+    return str(value).encode("ascii", "backslashreplace").decode("ascii")
+
+
+def trade_cache_path(symbol: str) -> Path:
+    return CACHE_DIR / f"dynamic_top40_trades_{symbol}.json"
+
+
 def ranking_cache_path(start: date, end: date) -> Path:
     return CACHE_DIR / f"dynamic_top40_ranking_{start}_{end}.json"
 
@@ -463,7 +471,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     ready_symbols: list[str] = []
     failed_symbols: list[str] = []
     for idx, symbol in enumerate(top40_union, 1):
-        print(f"market data: {idx}/{len(top40_union)} {symbol}", flush=True)
+        print(f"market data: {idx}/{len(top40_union)} {safe_text(symbol)}", flush=True)
         try:
             ok = ensure_symbol_data(symbol, warmup_ms, end_ms, refresh=args.refresh_symbol_data)
         except Exception as exc:  # noqa: BLE001
@@ -478,9 +486,15 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     all_trades: list[dict[str, Any]] = []
     failed_backtests: list[str] = []
     for idx, symbol in enumerate(ready_symbols, 1):
-        print(f"backtest: {idx}/{len(ready_symbols)} {symbol}", flush=True)
+        print(f"backtest: {idx}/{len(ready_symbols)} {safe_text(symbol)}", flush=True)
         try:
-            all_trades.extend(collect_symbol_trades(symbol))
+            tcache = trade_cache_path(symbol)
+            if not args.refresh_trade_data and tcache.exists():
+                trades = json.loads(tcache.read_text(encoding="utf-8"))
+            else:
+                trades = collect_symbol_trades(symbol)
+                tcache.write_text(json.dumps(trades, ensure_ascii=False), encoding="utf-8")
+            all_trades.extend(trades)
         except Exception as exc:  # noqa: BLE001
             failed_backtests.append(f"{symbol}: {exc}")
 
@@ -533,6 +547,7 @@ def main() -> int:
     parser.add_argument("--limit-symbols", type=int, help="debug only: scan only the first N exchange symbols")
     parser.add_argument("--refresh-rankings", action="store_true")
     parser.add_argument("--refresh-symbol-data", action="store_true")
+    parser.add_argument("--refresh-trade-data", action="store_true")
     args = parser.parse_args()
     run(args)
     return 0

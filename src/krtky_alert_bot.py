@@ -1344,13 +1344,22 @@ def build_entry_signal(level: int, direction: str, symbol: str, k: dict,
         next_action = "🎯 <b>크트키 자리</b> — 다음 15m봉 윗꼬리에서 매도"
 
     trig_line = ""
+    # 2026-05-17 결함 #5 발견 후 — fill 모델 분석:
+    # zone_low limit ≈ fill 률 85% + 좋은 가격 (백테스트 검증)
+    # zone_mid limit ≈ fill 률 15% (자리 놓침)
+    # zone_high limit = fill 률 100% but 비싸게 사서 EV ↓
+    # → 사용자에게 zone_low 부근 limit 권장
     if trigger_low is not None and trigger_high is not None:
         if direction == "long":
             trig_line = (f"\n진입 트리거 (밑꼬리 매수존): "
-                         f"{fmt_price(trigger_low)} ~ {fmt_price(trigger_high)}")
+                         f"{fmt_price(trigger_low)} ~ {fmt_price(trigger_high)}"
+                         f"\n  ⭐ limit 권장: {fmt_price(trigger_low)} 부근 "
+                         f"(좋은 가격 + fill 률 ~85%)")
         else:
             trig_line = (f"\n진입 트리거 (윗꼬리 매도존): "
-                         f"{fmt_price(trigger_low)} ~ {fmt_price(trigger_high)}")
+                         f"{fmt_price(trigger_low)} ~ {fmt_price(trigger_high)}"
+                         f"\n  ⭐ limit 권장: {fmt_price(trigger_high)} 부근 "
+                         f"(좋은 가격 + fill 률 ~85%)")
     extras_str = "\n• " + "\n• ".join(extras) if extras else ""
 
     # 익절 후보 + RR — sl 은 entry ∓ ATR×1.5
