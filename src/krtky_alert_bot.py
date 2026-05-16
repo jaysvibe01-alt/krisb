@@ -101,10 +101,14 @@ DEFAULT_SYMBOLS = [
     "DOGEUSDT", "LINKUSDT",                            # ★★ 10종
     "ADAUSDT", "AVAXUSDT", "SUIUSDT", "BNBUSDT",       # ★ 10종
     "TONUSDT", "HYPEUSDT",                             # 12종 (TON ★★)
-    "BCHUSDT", "FILUSDT", "ARBUSDT",                   # 19종 ★★ (BCH/FIL/ARB)
-    "LTCUSDT", "OPUSDT", "DOTUSDT", "ETCUSDT",         # 19종 ★ (LTC/OP/DOT/ETC)
+    "BCHUSDT", "FILUSDT", "ARBUSDT",                   # 19종 ★★
+    "LTCUSDT", "OPUSDT", "DOTUSDT", "ETCUSDT",         # 19종 ★
+    # 29종 확장 (사용자 요청: ZEC, AAVE, ENA, PENGU + rate-limit 재시도)
+    "AAVEUSDT", "ENAUSDT", "PENGUUSDT", "NEARUSDT",   # ★★ PREMIUM (Win 76-83%)
+    "APTUSDT", "SEIUSDT", "INJUSDT", "TIAUSDT", "WIFUSDT",  # ★★ 우수~PREMIUM
+    "ZECUSDT",                                          # ★ 채택
     # TRX 거부 (avg -0.080R Win 53% 손해)
-    # NEAR/APT/SEI/AAVE/INJ/TIA/PEPE/WIF: 데이터 다운로드 실패 — 추후 재시도
+    # PEPE 거부 (다운로드 실패 — Binance 표기 형식 확인 필요)
 ]
 # 런타임 universe — main() 에서 compute_universe() 결과로 채워짐
 SYMBOLS: list[str] = list(DEFAULT_SYMBOLS)
@@ -225,16 +229,24 @@ PRE_ALERT_TIMEOUT_BARS = 8
 SKIP_SEGMENTS: set[tuple[str, str]] = {
     ("short", "SOLUSDT"),
 }
-# 2026-05-17: 19종 확장 — ★★ 우수 등급 (Win ≥ 75%, avg R ≥ 0.35)
+# 2026-05-17: 29종 확장 — ★★ PREMIUM (Win ≥ 75%, avg R ≥ 0.35)
 PREMIUM_SEGMENTS: set[tuple[str, str]] = {
     ("long", "SOLUSDT"),    # RR 1.89 Win 74% (기존)
     ("long", "ETHUSDT"),    # RR 1.79 Win 72% (기존)
     ("long", "DOGEUSDT"),   # avg 0.390R Win 77% N=111
     ("long", "LINKUSDT"),   # avg 0.325R Win 74% N=99
-    ("long", "TONUSDT"),    # avg 0.358R Win 77% N=108 (★★ ETH급)
-    ("long", "BCHUSDT"),    # avg 0.418R Win 77% N=98  (★★ 19종 확장)
-    ("long", "FILUSDT"),    # avg 0.450R Win 79% N=91  (★★ 최강 — SOL 다음)
-    ("long", "ARBUSDT"),    # avg 0.431R Win 76% N=101 (★★ 19종 확장)
+    ("long", "TONUSDT"),    # avg 0.358R Win 77% N=108
+    ("long", "BCHUSDT"),    # avg 0.418R Win 77% N=98
+    ("long", "FILUSDT"),    # avg 0.450R Win 79% N=91
+    ("long", "ARBUSDT"),    # avg 0.431R Win 76% N=101
+    # 29종 신규 PREMIUM (★★ Win 75%+)
+    ("long", "WIFUSDT"),    # avg 0.650R Win 83.3% N=108 — 최강!
+    ("long", "AAVEUSDT"),   # avg 0.550R Win 82.7% N=104
+    ("long", "PENGUUSDT"),  # avg 0.542R Win 80.6% N=134
+    ("long", "TIAUSDT"),    # avg 0.441R Win 76.1% N=113
+    ("long", "INJUSDT"),    # avg 0.401R Win 78.2% N=110
+    ("long", "NEARUSDT"),   # avg 0.365R Win 75.5% N=110
+    ("long", "ENAUSDT"),    # avg 0.354R Win 76.8% N=95
 }
 
 # ────────────────────────────────────────────────────────────────────
@@ -391,11 +403,6 @@ def _load_ict_telegram_creds() -> tuple[Optional[str], Optional[str]]:
     importlib 로 명시 path 에서 ICT config.py 를 로드하므로, 같은 이름의
     다른 config.py 모듈과 sys.path 충돌은 없다.
     """
-    if os.environ.get("KRTKY_SKIP_ICT_CREDS", "").strip().lower() in (
-        "1", "true", "yes", "on"
-    ):
-        return None, None
-
     bot_token: Optional[str] = None
     chat_id: Optional[str] = None
 
