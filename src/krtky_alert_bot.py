@@ -1565,7 +1565,8 @@ def build_entry_signal(level: int, direction: str, symbol: str, k: dict,
     if trigger_low is not None and trigger_high is not None:
         # 종목별 동적 권장 레버리지 (2026-05-17 wick 99% 기반 청산 회피)
         safe_lev = get_safe_leverage(symbol)
-        lev_line = f"\n  🛡️ 권장 레버리지: **{safe_lev}x** (이 종목 wick 99% 기준 청산 회피)"
+        lev_line = (f"\n  🛡️ 권장 레버리지: **{safe_lev}x** + **Isolated 마진** ★"
+                    f"\n  📌 SL OCO 필수 (청산 회피)")
         if direction == "long":
             trig_line = (f"\n진입 트리거 (밑꼬리 매수존): "
                          f"{fmt_price(trigger_low)} ~ {fmt_price(trigger_high)}"
