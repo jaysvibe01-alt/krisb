@@ -931,6 +931,115 @@ def detect_volume_breakout(klines: list[dict], lookback: int = 20) -> bool:
     return last["volume"] >= avg_vol * 1.5
 
 
+def detect_breakout_retest(klines: list[dict], direction: str = "long",
+                           lookback: int = 30, retest_tolerance: float = 0.003) -> bool:
+    """Murph 통합전략 §2.5: 돌파 후 리테스트.
+
+    "돌파 직후 추격 X, 돌파 가격으로 가격이 다시 돌아온 자리 = 진짜 진입"
+
+    Long 조건:
+      1. 직전 N봉 안에 거래량 ↑ 돌파 캔들 있음 (resistance 돌파)
+      2. 현재 봉이 그 돌파 가격으로 되돌아왔음 (±tolerance)
+      3. 거래량 감소 (= 흡수 없이 단순 되돌림)
+    """
+    if len(klines) < lookback + 1:
+        return False
+    window = klines[-(lookback + 1):-1]
+    last = klines[-1]
+
+    # 1. 직전 lookback 봉에서 강한 돌파 찾기 (거래량 SMA × 1.5 이상 + 큰 양봉/음봉)
+    avg_vol = sum(k["volume"] for k in window) / len(window)
+    breakout_idx = None
+    breakout_price = None
+    for i in range(len(window) - 5):  # 마지막 5봉은 너무 가까움 - 제외
+        k = window[i]
+        body = abs(k["close"] - k["open"])
+        rng = k["high"] - k["low"]
+        if k["volume"] < avg_vol * 1.5: continue
+        if rng <= 0 or body / rng < 0.5: continue
+        if direction == "long" and k["close"] > k["open"]:
+            # 양봉 돌파 — 돌파 후 지지로 작용할 가격 = 직전 고점 또는 close
+            prev_high = max(w["high"] for w in window[max(0, i - 5):i]) if i > 0 else k["high"]
+            if k["close"] > prev_high:
+                breakout_idx = i
+                breakout_price = prev_high
+        elif direction == "short" and k["close"] < k["open"]:
+            prev_low = min(w["low"] for w in window[max(0, i - 5):i]) if i > 0 else k["low"]
+            if k["close"] < prev_low:
+                breakout_idx = i
+                breakout_price = prev_low
+
+    if breakout_idx is None or breakout_price is None:
+        return False
+
+    # 2. 현재 봉이 돌파 가격으로 되돌아옴 (±tolerance)
+    band = breakout_price * retest_tolerance
+    if direction == "long":
+        if not (last["low"] <= breakout_price + band and last["low"] >= breakout_price - band):
+            return False
+    else:
+        if not (last["high"] >= breakout_price - band and last["high"] <= breakout_price + band):
+            return False
+
+    # 3. 거래량 감소 (현재 봉 volume < avg_vol)
+    return last["volume"] < avg_vol
+
+
+# ───────────────────────────────────────────────────────────────
+# Murph 시장 유형 5분류 (통합전략 §3)
+# ───────────────────────────────────────────────────────────────
+def detect_market_type(klines: list[dict], lookback: int = 20) -> str:
+    """5가지 시장 유형 자동 분류.
+
+    A. 마지막 장대형 — 마지막 봉이 가장 큰 장대 + 거래량 폭발
+    B. 첫 장대 후 대기형 — 직전 N봉 안 첫 장대, 그 후 거래량 감소 + 짧은 캔들
+    C. 느린 하락형 — 모든 봉이 비슷한 크기, 추세 일관
+    D. 대폭락 — 직전 N봉에 매우 큰 wick (range > ATR × 3)
+    E. 두 번째 바닥 — 더블바텀/탑 (이미 detect_double_bottom)
+    """
+    if len(klines) < lookback + 1:
+        return "unknown"
+    tail = klines[-(lookback + 1):]
+
+    # E. 두 번째 바닥 (Long 가정) — 이미 옵션 D 에 있음 → 우선 처리
+    if detect_double_bottom(klines, "long"):
+        return "E_double_bottom"
+    if detect_double_bottom(klines, "short"):
+        return "E_double_top"
+
+    last = tail[-1]
+    bodies = [abs(k["close"] - k["open"]) for k in tail]
+    ranges = [k["high"] - k["low"] for k in tail]
+    vols = [k["volume"] for k in tail]
+    avg_body = sum(bodies[:-1]) / max(len(bodies) - 1, 1)
+    avg_vol = sum(vols[:-1]) / max(len(vols) - 1, 1)
+    last_body = bodies[-1]
+    last_vol = vols[-1]
+    last_range = ranges[-1]
+
+    # D. 대폭락 — 매우 큰 wick (range > 직전 avg × 3)
+    avg_range = sum(ranges[:-1]) / max(len(ranges) - 1, 1)
+    if last_range > avg_range * 3:
+        return "D_capitulation"
+
+    # A. 마지막 장대형 — 마지막 봉이 가장 큰 장대 + 거래량 폭발
+    if last_body >= max(bodies[:-1]) * 1.2 and last_vol >= avg_vol * 2.5:
+        return "A_last_climactic"
+
+    # B. 첫 장대 후 대기형 — 직전 20봉 안에 큰 장대 + 그 후 거래량 감소 + 짧은 캔들
+    big_bodies = [(i, b) for i, b in enumerate(bodies[:-1]) if b > avg_body * 2.0]
+    if big_bodies and last_body < avg_body * 0.7 and last_vol < avg_vol * 0.8:
+        return "B_post_climactic_wait"
+
+    # C. 느린 하락/상승 — 비슷한 크기 + 일관된 방향
+    body_std = (sum((b - avg_body) ** 2 for b in bodies) / len(bodies)) ** 0.5
+    cv = body_std / max(avg_body, 1e-12)  # 변동계수
+    if cv < 0.5:  # 봉 크기 비슷
+        return "C_slow_trend"
+
+    return "neutral"
+
+
 def has_absorption_streak(klines: list[dict], n: int = ABSORB_STREAK_LENGTH) -> bool:
     """슬라이드 15 '짧아진 캔들들': 직전 N봉이 거래량↑ + 몸통↓.
 
@@ -1561,14 +1670,22 @@ def evaluate_symbol_15m(symbol: str) -> None:
             level = 1
             extras = []
             # Murph 거래량 부스트 (2026-05-17 백테스트 검증)
-            # Murph A 바닥 폭발: EV +0.002R = 효과 없음 → 제거
-            # Murph C 감소 재하락: EV +0.160R ★★ 유지
-            # Murph D 돌파 거래량: EV +0.115R ★★ 신규 적용
+            # 시장 유형 분류 (검증된 부스트만 적용)
+            market_type = detect_market_type(closed_15m)
+            if market_type == "D_capitulation":
+                extras.append("⚡ 대폭락 자리 (Murph D 시장유형, EV +0.20R N=70)")
+                level = max(level, 3)  # 매우 강력 — Level 3
+            elif market_type == "A_last_climactic":
+                # 정보 라벨 (사용자 차트 참고용). 진입엔 -0.12R 역효과 검증됨.
+                extras.append("⚠️ 마지막 장대형 (Murph A 참고, EV -0.12R 주의)")
+                # level 변경 X — 진입 자체엔 부정 시그널
+            if detect_volume_climactic(closed_15m):
+                extras.append("💥 거래량 폭발 (Murph A 거래량, 참고)")
             if detect_volume_decay_pullback(closed_15m, "long"):
-                extras.append("📉 거래량 감소 재하락 (Murph C: 매도 약화, EV +0.16R)")
+                extras.append("📉 거래량 감소 재하락 (Murph C, EV +0.16R)")
                 level = max(level, 2)
             if detect_volume_breakout(closed_15m):
-                extras.append("🚀 돌파 거래량 (Murph D: 20봉 최고+1.5×, EV +0.115R)")
+                extras.append("🚀 돌파 거래량 (Murph D, EV +0.115R)")
                 level = max(level, 2)
             if has_absorption_streak(closed_15m):
                 extras.append("흡수 누적 (슬라이드 15 / Murph B)")
@@ -1682,13 +1799,20 @@ def evaluate_symbol_15m(symbol: str) -> None:
         if candle.is_bearish and candle.is_long_body and 1 <= elapsed_bars <= PRE_ALERT_TIMEOUT_BARS:
             level = 1
             extras = []
-            # Murph 거래량 부스트 — Short 대칭 (백테스트 검증)
-            # Murph A 제거 (EV 0R), C/D 유지/적용
+            # Murph 거래량 부스트 Short 대칭 (검증 후)
+            market_type = detect_market_type(closed_15m)
+            if market_type == "D_capitulation":
+                extras.append("⚡ 대폭락 자리 (Murph D 시장유형, EV +0.20R)")
+                level = max(level, 3)
+            elif market_type == "A_last_climactic":
+                extras.append("⚠️ 마지막 장대형 (Murph A 참고, EV -0.12R 주의)")
+            if detect_volume_climactic(closed_15m):
+                extras.append("💥 거래량 폭발 (Murph A 거래량, 참고)")
             if detect_volume_decay_pullback(closed_15m, "short"):
-                extras.append("📈 거래량 감소 재상승 (Murph C: 매수 약화, EV +0.16R)")
+                extras.append("📈 거래량 감소 재상승 (Murph C, EV +0.16R)")
                 level = max(level, 2)
             if detect_volume_breakout(closed_15m):
-                extras.append("🚀 돌파 거래량 (Murph D: 20봉 최고+1.5×, EV +0.115R)")
+                extras.append("🚀 돌파 거래량 (Murph D, EV +0.115R)")
                 level = max(level, 2)
             if has_absorption_streak(closed_15m):
                 extras.append("흡수 누적 (슬라이드 15 / Murph B)")
