@@ -1560,12 +1560,15 @@ def evaluate_symbol_15m(symbol: str) -> None:
         if candle.is_bullish and candle.is_long_body and 1 <= elapsed_bars <= PRE_ALERT_TIMEOUT_BARS:
             level = 1
             extras = []
-            # Murph 거래량 4유형 (2026-05-17 통합)
-            if detect_volume_climactic(closed_15m):
-                extras.append("💥 거래량 폭발 (Murph A: 바닥 폭발)")
-                level = max(level, 2)
+            # Murph 거래량 부스트 (2026-05-17 백테스트 검증)
+            # Murph A 바닥 폭발: EV +0.002R = 효과 없음 → 제거
+            # Murph C 감소 재하락: EV +0.160R ★★ 유지
+            # Murph D 돌파 거래량: EV +0.115R ★★ 신규 적용
             if detect_volume_decay_pullback(closed_15m, "long"):
-                extras.append("📉 거래량 감소 재하락 (Murph C: 매도 약화)")
+                extras.append("📉 거래량 감소 재하락 (Murph C: 매도 약화, EV +0.16R)")
+                level = max(level, 2)
+            if detect_volume_breakout(closed_15m):
+                extras.append("🚀 돌파 거래량 (Murph D: 20봉 최고+1.5×, EV +0.115R)")
                 level = max(level, 2)
             if has_absorption_streak(closed_15m):
                 extras.append("흡수 누적 (슬라이드 15 / Murph B)")
@@ -1679,12 +1682,13 @@ def evaluate_symbol_15m(symbol: str) -> None:
         if candle.is_bearish and candle.is_long_body and 1 <= elapsed_bars <= PRE_ALERT_TIMEOUT_BARS:
             level = 1
             extras = []
-            # Murph 거래량 4유형 — Short 대칭 (2026-05-17 통합)
-            if detect_volume_climactic(closed_15m):
-                extras.append("💥 거래량 폭발 (Murph A: 천장 폭발)")
-                level = max(level, 2)
+            # Murph 거래량 부스트 — Short 대칭 (백테스트 검증)
+            # Murph A 제거 (EV 0R), C/D 유지/적용
             if detect_volume_decay_pullback(closed_15m, "short"):
-                extras.append("📈 거래량 감소 재상승 (Murph C: 매수 약화)")
+                extras.append("📈 거래량 감소 재상승 (Murph C: 매수 약화, EV +0.16R)")
+                level = max(level, 2)
+            if detect_volume_breakout(closed_15m):
+                extras.append("🚀 돌파 거래량 (Murph D: 20봉 최고+1.5×, EV +0.115R)")
                 level = max(level, 2)
             if has_absorption_streak(closed_15m):
                 extras.append("흡수 누적 (슬라이드 15 / Murph B)")
