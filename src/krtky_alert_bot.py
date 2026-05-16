@@ -873,6 +873,64 @@ def _is_full_bar_in_downtrend(klines: list[dict], last_kline: dict,
     return is_breaking_low
 
 
+def detect_volume_climactic(klines: list[dict], multiplier: float = 3.0) -> bool:
+    """Murph 거래량 유형 A: 바닥 폭발 (climactic volume).
+
+    마지막 봉 거래량이 직전 10봉 평균 × multiplier 이상.
+    패닉셀/패닉바이 직후 첫 반등 자리 감지.
+    출처: Murph 통합전략 §3.A "마지막 장대형 — 거래량이 가장 크거나 눈에 띄게 증가"
+    """
+    if len(klines) < 11:
+        return False
+    last_vol = klines[-1]["volume"]
+    avg_vol = sum(k["volume"] for k in klines[-11:-1]) / 10
+    return last_vol >= avg_vol * multiplier
+
+
+def detect_volume_decay_pullback(klines: list[dict], direction: str = "long",
+                                 n: int = 3) -> bool:
+    """Murph 거래량 유형 C: 감소 재하락 (volume decay pullback).
+
+    직전 N봉 거래량이 줄어드는데 가격은 더 하락(상승) — 매도/매수 압력 약화 신호.
+    출처: Murph 통합전략 §3.B "거래량 감소 재하락 = 첫 장대 후 대기형 핵심"
+
+    조건 (long):
+      - 직전 N봉 거래량이 매봉 감소 추세
+      - 가격은 같거나 더 내려감 (저점 갱신)
+    """
+    if len(klines) < n + 1:
+        return False
+    tail = klines[-(n + 1):]
+    # 거래량 감소 추세
+    vols = [k["volume"] for k in tail]
+    for i in range(1, len(vols)):
+        if vols[i] >= vols[i - 1]:
+            return False
+    # 가격 방향 (long = 저점 갱신, short = 고점 갱신)
+    if direction == "long":
+        lows = [k["low"] for k in tail]
+        return lows[-1] <= lows[0]  # 같거나 더 내려감
+    else:
+        highs = [k["high"] for k in tail]
+        return highs[-1] >= highs[0]
+
+
+def detect_volume_breakout(klines: list[dict], lookback: int = 20) -> bool:
+    """Murph 거래량 유형 D: 돌파 후 추가 거래량 (breakout volume).
+
+    직전 N봉 최고 가격 돌파 + 거래량 평균 × 1.5 이상.
+    출처: Murph 통합전략 §3.D "돌파 후 추가 거래량"
+    """
+    if len(klines) < lookback + 1:
+        return False
+    prev_high = max(k["high"] for k in klines[-(lookback + 1):-1])
+    last = klines[-1]
+    if last["close"] <= prev_high:
+        return False  # 돌파 안 함
+    avg_vol = sum(k["volume"] for k in klines[-(lookback + 1):-1]) / lookback
+    return last["volume"] >= avg_vol * 1.5
+
+
 def has_absorption_streak(klines: list[dict], n: int = ABSORB_STREAK_LENGTH) -> bool:
     """슬라이드 15 '짧아진 캔들들': 직전 N봉이 거래량↑ + 몸통↓.
 
@@ -1502,8 +1560,15 @@ def evaluate_symbol_15m(symbol: str) -> None:
         if candle.is_bullish and candle.is_long_body and 1 <= elapsed_bars <= PRE_ALERT_TIMEOUT_BARS:
             level = 1
             extras = []
+            # Murph 거래량 4유형 (2026-05-17 통합)
+            if detect_volume_climactic(closed_15m):
+                extras.append("💥 거래량 폭발 (Murph A: 바닥 폭발)")
+                level = max(level, 2)
+            if detect_volume_decay_pullback(closed_15m, "long"):
+                extras.append("📉 거래량 감소 재하락 (Murph C: 매도 약화)")
+                level = max(level, 2)
             if has_absorption_streak(closed_15m):
-                extras.append("흡수 누적 (슬라이드 15)")
+                extras.append("흡수 누적 (슬라이드 15 / Murph B)")
                 level = max(level, 2)
             if detect_bullish_divergence(closed_15m):
                 extras.append("🟡 상승 RSI 다이버전스 (슬라이드 20·22)")
@@ -1614,8 +1679,15 @@ def evaluate_symbol_15m(symbol: str) -> None:
         if candle.is_bearish and candle.is_long_body and 1 <= elapsed_bars <= PRE_ALERT_TIMEOUT_BARS:
             level = 1
             extras = []
+            # Murph 거래량 4유형 — Short 대칭 (2026-05-17 통합)
+            if detect_volume_climactic(closed_15m):
+                extras.append("💥 거래량 폭발 (Murph A: 천장 폭발)")
+                level = max(level, 2)
+            if detect_volume_decay_pullback(closed_15m, "short"):
+                extras.append("📈 거래량 감소 재상승 (Murph C: 매수 약화)")
+                level = max(level, 2)
             if has_absorption_streak(closed_15m):
-                extras.append("흡수 누적 (슬라이드 15)")
+                extras.append("흡수 누적 (슬라이드 15 / Murph B)")
                 level = max(level, 2)
             if detect_bearish_divergence(closed_15m):
                 extras.append("🟡 하락 RSI 다이버전스 (슬라이드 26)")
