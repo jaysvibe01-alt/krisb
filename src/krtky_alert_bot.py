@@ -226,6 +226,52 @@ PRE_ALERT_TIMEOUT_BARS = 8
 # PREMIUM — 강한 우위 segment (RR > 1.5, Win > 70%) — ★ 강조 알림
 #   Long/SOLUSDT  : RR 1.89, Win 74.4%, TP1 76.9% — 표본 39건
 #   Long/ETHUSDT  : RR 1.79, Win 72.0%, TP1 76.0% — 표본 50건
+# 2026-05-17: 종목별 동적 안전 레버리지 (wick 99% + MMR 0.5% + 버퍼 2% 기준)
+# 출처: backtest_dynamic_leverage.py — 1년 wick 분포 실측
+# 청산 거리 > wick 99% 보장하는 최대 레버리지
+SAFE_LEVERAGE: dict[str, int] = {
+    # 🚀 공격 (15x+) — wick 99% < 5%
+    "BTCUSDT": 15,
+    # ✨ 표준 (10-15x) — wick 99% 5-7%
+    "ETHUSDT": 12,
+    "BNBUSDT": 11,
+    # 🟡 보수 (7-10x) — wick 99% 7-12%
+    "HYPEUSDT": 9,
+    "AVAXUSDT": 7,
+    "NEARUSDT": 7,
+    "AAVEUSDT": 7,
+    "DOGEUSDT": 7,
+    # ⚠️ 변동성 (5-7x)
+    "ADAUSDT": 6,
+    "SEIUSDT": 6,
+    "SUIUSDT": 6,
+    "BCHUSDT": 6,
+    "OPUSDT": 5,
+    "ENAUSDT": 5,
+    "DOTUSDT": 5,
+    "LINKUSDT": 5,
+    "XRPUSDT": 5,
+    "ARBUSDT": 5,
+    "LTCUSDT": 5,
+    "INJUSDT": 5,
+    "TIAUSDT": 5,
+    "ETCUSDT": 5,
+    # ❌ 위험 (<5x) — wick 99% > 18%
+    "TONUSDT": 4,
+    "APTUSDT": 4,
+    "WIFUSDT": 4,
+    "SOLUSDT": 4,
+    "ZECUSDT": 4,
+    "PENGUUSDT": 4,
+    "FILUSDT": 3,   # wick 최대 82%! 매우 신중
+}
+
+
+def get_safe_leverage(symbol: str) -> int:
+    """종목별 권장 안전 레버리지. 미등록 종목은 보수적으로 5x."""
+    return SAFE_LEVERAGE.get(symbol, 5)
+
+
 SKIP_SEGMENTS: set[tuple[str, str]] = {
     ("short", "SOLUSDT"),
 }
@@ -1517,16 +1563,21 @@ def build_entry_signal(level: int, direction: str, symbol: str, k: dict,
     # zone_high limit = fill 률 100% but 비싸게 사서 EV ↓
     # → 사용자에게 zone_low 부근 limit 권장
     if trigger_low is not None and trigger_high is not None:
+        # 종목별 동적 권장 레버리지 (2026-05-17 wick 99% 기반 청산 회피)
+        safe_lev = get_safe_leverage(symbol)
+        lev_line = f"\n  🛡️ 권장 레버리지: **{safe_lev}x** (이 종목 wick 99% 기준 청산 회피)"
         if direction == "long":
             trig_line = (f"\n진입 트리거 (밑꼬리 매수존): "
                          f"{fmt_price(trigger_low)} ~ {fmt_price(trigger_high)}"
                          f"\n  ⭐ limit 권장: {fmt_price(trigger_low)} 부근 "
-                         f"(좋은 가격 + fill 률 ~85%)")
+                         f"(좋은 가격 + fill 률 ~85%)"
+                         f"{lev_line}")
         else:
             trig_line = (f"\n진입 트리거 (윗꼬리 매도존): "
                          f"{fmt_price(trigger_low)} ~ {fmt_price(trigger_high)}"
                          f"\n  ⭐ limit 권장: {fmt_price(trigger_high)} 부근 "
-                         f"(좋은 가격 + fill 률 ~85%)")
+                         f"(좋은 가격 + fill 률 ~85%)"
+                         f"{lev_line}")
     extras_str = "\n• " + "\n• ".join(extras) if extras else ""
 
     # 익절 후보 + RR — sl 은 entry ∓ ATR×1.5
