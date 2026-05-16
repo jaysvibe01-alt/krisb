@@ -1594,8 +1594,10 @@ def build_entry_signal(level: int, direction: str, symbol: str, k: dict,
             klines_1d=klines_1d,
         )
         emoji_seq = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣"]
-        # 분할 청산 가이드 (검증된 분할 비율)
-        split_pcts = ["50% 청산", "20% 청산", "20% 청산", "10% 청산", "잔여", "잔여"]
+        # 2026-05-17 v1.15: Kris 단타 모델 검증 (TP1 전량 = +34,980% vs 길게 +20.8%)
+        # TP1 (1.236R) 100% 청산 권장. 찐하락(Murph D)만 길게 끌고 감.
+        split_pcts = ["🎯 100% 청산 (Kris 단타)", "(찐하락 시 추가)", "(찐하락 시 추가)",
+                      "(찐하락 시 추가)", "(잔여 trail)", "(잔여 trail)"]
         tp_lines: list[str] = []
         for i, (tp_label, tp_price, _src) in enumerate(targets[:6]):
             if direction == "long":
@@ -1609,9 +1611,10 @@ def build_entry_signal(level: int, direction: str, symbol: str, k: dict,
                 f"  {emoji_seq[i]} {fmt_price(tp_price)} — {tp_label} (RR {rr:.1f}) — {split}"
             )
         if tp_lines:
-            tp_block = ("\n✨ <b>익절 후보 (크보나치 6단계 + 분할 청산)</b>\n"
+            tp_block = ("\n✨ <b>익절 (Kris 단타식: TP1 전량 → 재진입)</b>\n"
                         + "\n".join(tp_lines)
-                        + "\n  💡 TP1 50% 청산 후 SL 본전 이동 권장")
+                        + "\n  💡 검증: TP1 100% 청산 = +34,980% vs 길게 끌기 +20.8% (1,683배)"
+                        + "\n  ⚡ 단, '⚡ 대폭락' 자리만 길게 끌고 가기 (Kris 본인 룰)")
 
     # 손절폭 + 가격 둘 다 표시
     sl_line = (
@@ -1619,15 +1622,16 @@ def build_entry_signal(level: int, direction: str, symbol: str, k: dict,
         f"({'↓' if direction == 'long' else '↑'} {fmt_price(sl_price)}) · ATR×1.5"
     )
 
-    # 운영 가이드 한 줄 (v1.13 검증 기반)
+    # 운영 가이드 — v1.15 Kris 단타 모델 검증 후
     safe_lev = get_safe_leverage(symbol)
     ops_line = (
         f"\n━━━━━━━━━━━━━━━━━━\n"
-        f"💼 <b>운영 가이드</b>\n"
-        f"  • 마진: <b>Isolated</b> · 레버리지: <b>{safe_lev}x</b> (이 종목 wick 99% 기준 안전)\n"
+        f"💼 <b>운영 가이드 (Kris 단타식)</b>\n"
+        f"  • 마진: <b>Isolated</b> · 레버리지: <b>{safe_lev}x</b> (종목별 wick 99% 기준)\n"
         f"  • 자본 / 포지션: 50% · 동시 한도: 2 포지션\n"
-        f"  • SL OCO 필수 등록 (청산 회피)\n"
-        f"  • TP1 hit 후 SL 본전 이동 권장"
+        f"  • SL OCO 필수 등록\n"
+        f"  • <b>TP1 (1.236R) 도달 시 100% 청산 → 재진입 대기</b> ⭐\n"
+        f"  • 단, '⚡ 대폭락 자리' 부스트 있을 때만 길게 끌고 가기"
     )
     return (
         f"{icon} [{KRTKY_LABEL}] {label} · <b>{direction.upper()}</b> · "
