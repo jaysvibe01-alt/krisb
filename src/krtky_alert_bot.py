@@ -1613,8 +1613,9 @@ def build_entry_signal(level: int, direction: str, symbol: str, k: dict,
         if tp_lines:
             tp_block = ("\n✨ <b>익절 (Kris 단타식: TP1 전량 → 재진입)</b>\n"
                         + "\n".join(tp_lines)
-                        + "\n  💡 검증: M1 단순 단타 = +34,980% (6 모델 비교 1위)"
-                        + "\n  📊 D 대폭락도 단타 정답 (Murph 4강 06:23 '300불 먹고 바로 나가')")
+                        + "\n  💡 검증: M1 단순 단타 = +375%/년 (6 모델 1위, 결함 #6/#7 보정 후)"
+                        + "\n  📊 D 대폭락도 단타 정답 (Murph 4강 06:23 '300불 먹고 바로 나가')"
+                        + "\n  ⚠️ 라이브 추정 +200~300%/년 (체결+슬리피지 보정)")
 
     # 손절폭 + 가격 둘 다 표시
     sl_line = (
